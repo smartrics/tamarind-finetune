@@ -12,3 +12,5 @@ gcsfs
 torch 
 torchaudio  
 torchvision 
+ipywidgets
+notebook
