@@ -1,0 +1,4 @@
+accelerate
+transformers==4.50.0
+datasets==3.5.0
+huggingface_hub>=0.20.0
