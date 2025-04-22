@@ -1,3 +1,4 @@
+accelerate
 transformers==4.50.0
 datasets==3.5.0
 peft==0.14.0
