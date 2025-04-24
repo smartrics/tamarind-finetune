@@ -10,6 +10,10 @@ spec_input_dir = Path(".data/spec_data").absolute()
 # === Load and process wf_*.json files ===
 def load_tune_data(input_dir):
     jsonl_pairs = []
+    prompt = ""
+    with open(input_dir / "prompt.md", "r") as f:
+        prompt = f.read()
+        
     for file in input_dir.glob("*.json"):
         if file.name == "prompt.md":
             continue
@@ -24,6 +28,7 @@ def load_tune_data(input_dir):
             metadata = content.get("metadata", {})
 
             user_input = json.dumps({
+                "prompt": prompt,
                 "metadata": metadata,
                 "instructions": instructions
             })
@@ -42,13 +47,26 @@ def load_tune_data(input_dir):
 def load_spec_data(spec_dir):
     spec_pairs = []
 
+    prompt = ""
+    with open(spec_dir / "prompt.md", "r") as f:
+        prompt = f.read()
+
+    def add_prompt(records):
+        new_records = []
+        for record in records:
+            if "input" in record and "output" in record:
+                new_record = {
+                    "input": prompt + "\n\n" + record["input"],
+                    "output": record["output"]
+                }
+                new_records.append(new_record)
+        return new_records
+
     # Load spec*.json files
     for file in spec_dir.glob("spec*.json"):
         with open(file, "r") as f:
             records = json.load(f)
-            for record in records:
-                if "input" in record and "output" in record:
-                    spec_pairs.append(record)
+            spec_pairs = add_prompt(records)
 
     # Load validation_data from validity_dataset.py
     spec_val = []
@@ -56,6 +74,7 @@ def load_spec_data(spec_dir):
     if val_path.exists():
         with open(val_path, "r") as f:
             spec_val = json.load(f)
+            spec_val = add_prompt(spec_val)
 
     return spec_pairs, spec_val
 
@@ -93,9 +112,20 @@ random.shuffle(combined_val)
 max_input_len = max([len(d["input"]) for d in combined_train + combined_test + combined_val], default=0)
 max_output_len = max([len(d["output"]) for d in combined_train + combined_test + combined_val], default=0)
 
-output_train_path = Path("data/training_data.jsonl")
-output_test_path = Path("data/test_data.jsonl")
-output_val_path = Path("data/validation_data.jsonl")
+min_input_len = min([len(d["input"]) for d in combined_train + combined_test + combined_val], default=0)
+min_output_len = min([len(d["output"]) for d in combined_train + combined_test + combined_val], default=0)
+
+for d in combined_train + combined_test + combined_val:
+    if len(d["input"]) == min_input_len:
+        print(d)
+
+for d in combined_train + combined_test + combined_val:
+    if len(d["output"]) == min_output_len:
+        print(d)
+
+output_train_path = Path("data_codet5/training_data.jsonl")
+output_test_path = Path("data_codet5/test_data.jsonl")
+output_val_path = Path("data_codet5/validation_data.jsonl")
 
 def write_jsonl_file(path, data):
     with open(path, "w") as f:
@@ -113,13 +143,17 @@ df = pd.DataFrame({
         "WF_Training", "WF_Test", "WF_Validation",
         "SP_Training", "SP_Test", "SP_Validation",
         "Training", "Test", "Validation", 
-        "Max Input Length", "Max Output Length"],
+        "Max Input Length", "Max Output Length",
+        "Min Input Length", "Min Output Length"
+        ],
     "Count": [
         len(tune_data), len(spec_data), 
         len(tune_train_data), len(tune_test_data), len(tune_val_data), 
         len(spec_train_data), len(spec_test_data), len(spec_val_data), 
         len(combined_train), len(combined_test), len(combined_val), 
-        max_input_len, max_output_len]
+        max_input_len, max_output_len,
+        min_input_len, min_output_len
+        ]
 })
 
 print(df)
