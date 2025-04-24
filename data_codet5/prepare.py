@@ -7,6 +7,13 @@ import pandas as pd
 tune_input_dir = Path(".data/test_data_1").absolute()
 spec_input_dir = Path(".data/spec_data").absolute()
 
+
+def add_prompt(prompt, record):
+    return {
+        "input": prompt + "\n\n" + record["input"],
+        "output": record["output"]
+    }
+
 # === Load and process wf_*.json files ===
 def load_tune_data(input_dir):
     jsonl_pairs = []
@@ -28,19 +35,18 @@ def load_tune_data(input_dir):
             metadata = content.get("metadata", {})
 
             user_input = json.dumps({
-                "prompt": prompt,
                 "metadata": metadata,
                 "instructions": instructions
-            })
+            }, separators=(',', ':'))
 
             model_output = json.dumps({
                 "workflow": workflow
-            })
+            }, separators=(',', ':'))
 
-            jsonl_pairs.append({
+            jsonl_pairs.append(add_prompt(prompt, {
                 "input": user_input,
                 "output": model_output
-            })
+            }))
     return jsonl_pairs
 
 # === Load and process spec*.json + validity_dataset.py ===
@@ -51,30 +57,22 @@ def load_spec_data(spec_dir):
     with open(spec_dir / "prompt.md", "r") as f:
         prompt = f.read()
 
-    def add_prompt(records):
-        new_records = []
-        for record in records:
-            if "input" in record and "output" in record:
-                new_record = {
-                    "input": prompt + "\n\n" + record["input"],
-                    "output": record["output"]
-                }
-                new_records.append(new_record)
-        return new_records
 
     # Load spec*.json files
     for file in spec_dir.glob("spec*.json"):
         with open(file, "r") as f:
             records = json.load(f)
-            spec_pairs = add_prompt(records)
+            for r in records:
+                spec_pairs.append(add_prompt(prompt, r))
 
     # Load validation_data from validity_dataset.py
     spec_val = []
     val_path = spec_dir / "validity_dataset.json"
     if val_path.exists():
         with open(val_path, "r") as f:
-            spec_val = json.load(f)
-            spec_val = add_prompt(spec_val)
+            loaded = json.load(f)
+            for r in loaded:
+                spec_val.append(add_prompt(prompt, r))
 
     return spec_pairs, spec_val
 
@@ -130,7 +128,7 @@ output_val_path = Path("data_codet5/validation_data.jsonl")
 def write_jsonl_file(path, data):
     with open(path, "w") as f:
         for item in data:
-            f.write(json.dumps(item) + "\n")
+            f.write(json.dumps(item, separators=(',', ':')) + "\n")
 
 write_jsonl_file(output_train_path, combined_train)
 write_jsonl_file(output_test_path, combined_test)
