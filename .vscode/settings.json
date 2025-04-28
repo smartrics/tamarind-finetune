@@ -2,6 +2,8 @@
     "cSpell.words": [
         "codet",
         "huggingface",
-        "starcoderbase"
+        "starcoderbase",
+        "venv",
+        "wandb"
     ]
 }

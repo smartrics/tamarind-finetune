@@ -53,38 +53,14 @@ def load_spec_data(spec_dir):
 def prepare_csv_data(dataset):
     rows = []
     for idx, item in enumerate(dataset):
-        content = f"<fim_prefix>{item['input']}<fim_suffix><fim_middle>{item['output']}"
-        rows.append({"id": idx, "content": content})
+        rows.append({"id": idx, "question": item['input'], "response": item["output"]})
     return pd.DataFrame(rows)
 
 
 # === Load datasets ===
-tune_data = load_tune_data(tune_input_dir)
-spec_data = load_spec_data(spec_input_dir)
+tamarind_data = load_tune_data(tune_input_dir) + load_spec_data(spec_input_dir)
 
-random.shuffle(tune_data)
-random.shuffle(spec_data)
-
-# === Split datasets ===
-def split_data(data):
-    n = len(data)
-    train_end = int(n * 0.8)
-    test_end = int(n * 0.9)
-    return data[:train_end], data[train_end:test_end], data[test_end:]
-
-tune_train_data, tune_test_data, tune_val_data = split_data(tune_data)
-spec_train_data, spec_test_data, spec_val_data = split_data(spec_data)
-
-# === Combine datasets ===
-combined_train = tune_train_data + spec_train_data
-combined_test = tune_test_data + spec_test_data
-combined_val = tune_val_data
-
-random.shuffle(combined_train)
-random.shuffle(combined_test)
-random.shuffle(combined_val)
+random.shuffle(tamarind_data)
 
 # === Write CSVs ===
-prepare_csv_data(combined_train).to_csv(output_dir / "training_data.csv", index=False)
-prepare_csv_data(combined_test).to_csv(output_dir / "test_data.csv", index=False)
-prepare_csv_data(combined_val).to_csv(output_dir / "validation_data.csv", index=False)
+prepare_csv_data(tamarind_data).to_csv(output_dir / "tamarind_data.csv", index=False)
