@@ -199,7 +199,7 @@ def create_datasets(tokenizer, args):
         ext = args.dataset_type
         if not ext:
             ext = os.path.splitext(args.dataset_path)[1][1:]
-        dataset = load_dataset(ext, data_files=args.data_files, split=args.split)["train"]
+        dataset = load_dataset(ext, data_files=args.dataset_path, split=args.split)["train"]
         dataset = dataset.train_test_split(test_size=0.1, seed=args.seed)
     else:
         dataset = load_dataset(
