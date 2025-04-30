@@ -1,4 +1,4 @@
-hf.token.txt
-wandb.token.txt
+.hf.token.txt
+.wandb.token.txt
 .venv/
 .data
