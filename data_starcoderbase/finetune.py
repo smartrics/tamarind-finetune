@@ -33,8 +33,43 @@ class SavePeftModelCallback(TrainerCallback):
         torch.save({}, pytorch_model_path)
         return control
 
+try:
+    from safetensors.torch import load_file as safe_load
+    SAFETENSORS_AVAILABLE = True
+except ImportError:
+    SAFETENSORS_AVAILABLE = False
 
 class LoadBestPeftModelCallback(TrainerCallback):
+    def on_train_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        print(f"Loading best peft model from {state.best_model_checkpoint} (score: {state.best_metric}).")
+
+        checkpoint_dir = state.best_model_checkpoint
+        model = kwargs["model"]
+
+        safetensors_path = os.path.join(checkpoint_dir, "adapter_model.safetensors")
+        bin_path = os.path.join(checkpoint_dir, "adapter_model.bin")
+
+        if os.path.exists(safetensors_path) and SAFETENSORS_AVAILABLE:
+            print(f"Loading adapter weights from {safetensors_path}")
+            adapters_weights = safe_load(safetensors_path)
+        elif os.path.exists(bin_path):
+            print(f"Loading adapter weights from {bin_path}")
+            adapters_weights = torch.load(bin_path)
+        else:
+            raise FileNotFoundError(
+                f"No adapter model file found in {checkpoint_dir}. Expected one of: adapter_model.safetensors or adapter_model.bin"
+            )
+
+        set_peft_model_state_dict(model, adapters_weights)
+        return control
+    
+class LoadBestPeftModelCallbackOld(TrainerCallback):
     def on_train_end(
         self,
         args: TrainingArguments,
@@ -307,7 +342,21 @@ def run_training(args, train_data, val_data):
                     callbacks=[SavePeftModelCallback, LoadBestPeftModelCallback])
 
     print("Training...")
-    trainer.train()
+    import glob
+
+    # Check for existing checkpoints
+    checkpoints = sorted(
+        glob.glob(os.path.join(args.output_dir, f"{PREFIX_CHECKPOINT_DIR}-*")),
+        key=lambda x: int(x.split("-")[-1]),
+    )
+
+    if checkpoints:
+        last_checkpoint = checkpoints[-1]
+        print(f"Found existing checkpoint at {last_checkpoint}. Resuming training...")
+        trainer.train(resume_from_checkpoint=last_checkpoint)
+    else:
+        print("No checkpoint found. Starting training from scratch.")
+        trainer.train()
 
     print("Saving last checkpoint of the model")
     model.save_pretrained(os.path.join(args.output_dir, "final_checkpoint/"))
