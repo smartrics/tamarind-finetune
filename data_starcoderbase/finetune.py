@@ -12,6 +12,18 @@ from transformers import TrainerCallback, TrainingArguments, TrainerState, Train
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
 
+def patched_load_rng_state(self, checkpoint_folder):
+    import torch
+    import os
+    rng_file = os.path.join(checkpoint_folder, "rng_state.pth")
+    if os.path.isfile(rng_file):
+        try:
+            checkpoint_rng_state = torch.load(rng_file, weights_only=False)  # <-- PATCHED HERE
+            self._rng_state = checkpoint_rng_state
+        except Exception as e:
+            print(f"⚠️ Failed to load RNG state from checkpoint. Continuing without it. Error: {e}")
+
+Trainer._load_rng_state = patched_load_rng_state
 
 """
 Fine-Tune StarCoder on Code Alpaca/SE
