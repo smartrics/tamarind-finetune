@@ -4,11 +4,12 @@ import os
 import torch
 from accelerate import Accelerator
 from datasets import load_dataset
+import time
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, set_peft_model_state_dict
 from torch.utils.data import IterableDataset
 from tqdm import tqdm
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, logging, set_seed
-from transformers import TrainerCallback, TrainingArguments, TrainerState, TrainerControl
+from transformers import TrainerCallback, TrainerState, TrainerControl, TrainingArguments
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, logging, set_seed
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
 
@@ -28,6 +29,36 @@ Trainer._load_rng_state = patched_load_rng_state
 """
 Fine-Tune StarCoder on Code Alpaca/SE
 """
+
+
+class ETACallback(TrainerCallback):
+    def __init__(self):
+        self.start_time = None
+
+    def on_step_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        if self.start_time is None:
+            self.start_time = time.time()
+
+    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
+        if self.start_time is None or state.global_step == 0:
+            return
+
+        elapsed = time.time() - self.start_time
+        steps_completed = state.global_step
+        total_steps = args.max_steps
+
+        percent_done = steps_completed / total_steps
+        estimated_total_time = elapsed / percent_done
+        eta = estimated_total_time - elapsed
+
+        def hms(seconds):
+            h = int(seconds // 3600)
+            m = int((seconds % 3600) // 60)
+            s = int(seconds % 60)
+            return f"{h}h {m}m {s}s"
+
+        print(f"[ETA] {percent_done:.1%} complete — Elapsed: {hms(elapsed)}, Remaining: {hms(eta)}")
+
 
 class SavePeftModelCallback(TrainerCallback):
     def on_save(
@@ -351,7 +382,10 @@ def run_training(args, train_data, val_data):
                     args=training_args, 
                     train_dataset=train_data, 
                     eval_dataset=val_data, 
-                    callbacks=[SavePeftModelCallback, LoadBestPeftModelCallback])
+                    callbacks=[
+                        SavePeftModelCallback, 
+                        LoadBestPeftModelCallback,
+                        ETACallback])
 
     print("Training...")
     import glob
