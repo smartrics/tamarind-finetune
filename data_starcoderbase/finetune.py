@@ -384,8 +384,7 @@ def run_training(args, train_data, val_data):
                     eval_dataset=val_data, 
                     callbacks=[
                         SavePeftModelCallback, 
-                        LoadBestPeftModelCallback,
-                        ETACallback])
+                        LoadBestPeftModelCallback])
 
     print("Training...")
     import glob
